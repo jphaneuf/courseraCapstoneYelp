@@ -7,9 +7,11 @@ Created on Mon Nov  2 18:41:34 2015
 
 import json,re
 from pprint import pprint
+import numpy as np
 import pylab as p
 import pandas
-
+import random
+import operator
 populationData = pandas.read_csv('./SUB-EST2014_ALL.csv')
 
 with open('./yelp_dataset_challenge_academic_dataset/yelp_academic_dataset_business.json') as data_file:
@@ -23,9 +25,111 @@ with open('./yelp_dataset_challenge_academic_dataset/yelp_academic_dataset_tip.j
 with open('./yelp_dataset_challenge_academic_dataset/yelp_academic_dataset_user.json') as data_file:
     user = [json.loads(x) for x in data_file]
 
+"""
+#generate list of cities/states and create training, validation, and test sets
+cities= []
+for x in biz:# generate list of cities/states (unique)
+    newCity = {'city':x['city'],'state':x['state']}
+    if newCity not in cities:
+        cities.append(newCity) #
+cities.sort(key=operator.itemgetter('city','state'))
+"""
+#data sets broken into training/testing/validation by city
+"""
+cityRandomizer = range(len(cities))
+np.random.shuffle(cityRandomizer)
+#Save for later
+with open('cityRandomizedOrder.csv','w') as f:
+    for n in cityRandomizer:
+        print n        
+        f.write(str(n)+'\n')
+"""
+with open('cityRandomizedOrder.csv','r') as f:
+    cityRandomizer = f.read().split('\n')
+cityRandomizer.pop() #remove last line
+cityRandomizer = [int(x) for x in cityRandomizer]
 
+"""
+trn = int(round(0.6*len(cityRandomizer)))
+tst = int(round(0.8*len(cityRandomizer)))
+trainingCities = [cities[x] for x in cityRandomizer[:trn]]
+"""
+
+def makeNewLine(business):
+    categories = ''
+    for cat in business['categories']:
+        categories += cat+';'
+        #convert category list to ; separated string
+    x = business['business_id']+','
+    x+= business['city']+','
+    x+= business['state']+','
+    x+= str(business['review_count'])+','
+    x+= str(business['stars'])+','
+    x+= categories+'\n'
+    return x
+
+#DF should have categories,city,state,bizId,stars,review_count,
+with open('biz.csv','w') as f:
+    f.write('bizId,city,state,review_count,stars,categories\n')
+    for b in biz:
+        makeNewLine(b)
+        f.write(makeNewLine(b).encode('utf8'))
+with open('cats.csv','w') as f:
+    #long form data set of each category entry with a biz id
+    f.write('bizId,category\n')
+    for b in biz:
+        for c in b['categories']:
+            category = re.sub(',',';',c) #replace commas with ;
+            newLine = b['business_id']+','+category+'\n'
+            f.write(newLine)
+            
+#or, combine those two dataframes
+def makeNewLine(business):
+    x = re.sub(',',';',business['business_id'])+','
+    x+= re.sub(',',';',business['city'])+','
+    x+= re.sub(',',';',business['state'])+','
+    x+= re.sub(',',';',str(business['review_count']))+','
+    x+= re.sub(',',';',str(business['stars']))+','
+    return x
+
+#DF should have categories,city,state,bizId,stars,review_count,
+with open('bizcats.csv','w') as f:
+    f.write('bizId,city,state,review_count,stars,category\n')
+    for b in biz:
+        for c in b['categories']:
+            category = re.sub(',',';',c)
+            newLine = makeNewLine(b).encode('utf8')+category.encode('utf8')+'\n'
+            f.write(newLine)
+    
+    
+"""
+totalStates = []
+for b in biz:
+    if b['state'] not in totalStates:
+        totalStates.append(b['state'])
+        print b['state']
+        if b['state'] =='OR':
+            print b
+        print b['latitude'],b['longitude']
+"""
 #exploratory
 ##look at businesses in pittsburgh, PA
+#thoughts on approach:
+#can do an inference.or create a training,test and validation set
+#and try to make predictions
+#can use the trainining dataset to look for factors that contribute
+#i.e. population size, number of competing restaurants
+#will do the latter
+# so need to
+"""
+1) create dataframe
+2) create function for processing a city
+3) do exploratory plotting on trainiing dataset and look for factors that
+ contribute to star rating
+4) select an algorithm to apply
+5) test it
+"""
+
 
 bizPitt = []
 for b in biz:

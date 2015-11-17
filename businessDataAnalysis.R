@@ -17,9 +17,38 @@ catTotalsInCity <- table(biz$catCityState)
 uniqueCities <- names(businessTotalsInCity)
 
 population <- read.csv('SUB-EST2014_ALL.csv')
-population$cityState <- paste0(population$NAME,rep(';',nrow(population)),population$STNAME)
-stateAbbreviation <- read.csv('stateAbbreviations.csv',header=TRUE) 
-stateAbbreviation$abbreviation[stateAbbreviation$state=='Alabama']
+#All cities have city/town suffix, remove please
+population$NAME <- sapply(population$NAME,function(x) sub(' town','',x))
+population$NAME <- sapply(population$NAME,function(x) sub(' city','',x))
+
+#population$cityState <- paste0(population$NAME,rep(';',nrow(population)),population$STNAME)
+stab <- read.csv('stateAbbreviations.csv',header=TRUE) 
+#stab$abbreviation[stab$state=='Alabama']
+abbreviateState <- function(state){
+  state <- as.character(state)
+  if(state %in% stab$state){
+    index<-which(stab$state==state)
+    return(as.character(stab$abbreviation[index]))
+  }else{
+    return(NA)
+  }
+}
+
+population$cityState <- paste0(population$NAME,rep(';',nrow(population)),
+                    sapply(population$STNAME,abbreviateState))
+population <- population[!duplicated(population$cityState),]
+getPopulation <- function(cityState){
+  cityState <- as.character(cityState)
+  if(cityState %in% population$cityState){
+    index<-which(population$cityState==cityState)
+    print(index)
+    return(as.character(population$POPESTIMATE2014[index]))
+  }else{
+    return(NA)
+  }
+} 
+
+
 xdf <- data.frame()
 for(i in 1:nrow(biz)){
   newLine= biz[i,c('category','city','state','cityState','catCityState')]
@@ -34,17 +63,21 @@ for(i in 1:nrow(biz)){
   xdf <- rbind(xdf,newLine)
 }
 xdf <-read.csv('xdf.csv')
-
+}
 ndxdf <- xdf[!duplicated(xdf),]#remove duplicates
 
-inTraining <- createDataPartition(y=1:nrow(ndxdf),p=0.6,list=FALSE)
-inTesting <- (1:nrow(ndxdf))[-inTraining]
+ndxdfp <- read.csv('ndxdfp.csv')
+ndxdfp <- ndxdfp[!duplicated(ndxdfp),]#remove duplicates
+ndxdfp <- subset(ndxdfp,!is.na(population))
+inTraining <- createDataPartition(y=1:nrow(ndxdfp),p=0.6,list=FALSE)
+inTesting <- (1:nrow(ndxdfp))[-inTraining]
 t1 <- inTraining[1:6000]
 t2 <- inTraining[-t1]
-rfModel <- train(meanStars ~ categoryRatio, data=ndxdf[t1,],method='knn')
-print(predict(rfModel,ndxdf[t2,]))
-plot(ndxdf[t2,]$meanStars,predict(rfModel,ndxdf[t2,]))
-#confusionMatrix(ndxdf[t2,]$meanStars,predict(rfModel,ndxdf[t2,]))
+rfModel <- train(meanStars ~ categoryRatio+population, data=ndxdfp[t1,],method='gbm')
+predicted <- predict(rfModel,ndxdfp[t2,])
+print(predict(rfModel,ndxdfp[t2,]))
+plot(ndxdfp[t2,]$meanStars,predicted)
+confusionMatrix(ndxdfp[t2,]$meanStars,predicted)
 names(getModelInfo())
 #businessTotalsInCity[uniqueCities[100]] #using cityState, grab business totals
 
